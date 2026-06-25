@@ -9,8 +9,11 @@ import 'player.dart';
 class Game implements GameEngine {
   final Board _board = Board();
   final Random _random = Random();
+
   static const int redXMove = -1;
   static const int _extraTurnMarker = 0;
+
+  List<bool> lastSticks = [];
 
   @override
   late final GameState state;
@@ -30,19 +33,24 @@ class Game implements GameEngine {
 
   @override
   int throwSticks() {
-    final flatSticks = _random.nextInt(5);
+    lastSticks = List.generate(5, (_) => _random.nextBool());
+
+    final showingCount = lastSticks.where((showing) => showing).length;
+    final redXShowing = lastSticks[0];
 
     int moveValue;
 
-    if (flatSticks == 0) {
+    if (showingCount == 1 && redXShowing) {
+      moveValue = redXMove;
+    } else if (showingCount == 0) {
       moveValue = 5;
     } else {
-      moveValue = flatSticks;
+      moveValue = showingCount;
     }
 
     state.availableThrows.add(moveValue);
 
-    if (flatSticks == 0 || flatSticks == 4) {
+    if (moveValue == 5) {
       state.availableThrows.add(_extraTurnMarker);
     }
 
@@ -54,21 +62,46 @@ class Game implements GameEngine {
   void movePiece(Piece piece, int moveValue) {
     _validateMove(piece, moveValue);
 
-    if (moveValue == redXMove) {
-      _movePieceBackward(piece);
-    } else {
-      _movePieceForward(piece, moveValue);
+    final movingPieces = _piecesMovingWith(piece);
+
+    for (final movingPiece in movingPieces) {
+      if (moveValue == redXMove) {
+        _movePieceBackward(movingPiece);
+      } else {
+        _movePieceForward(movingPiece, moveValue);
+      }
+    }
+
+    for (final movingPiece in movingPieces) {
+      _captureOpponentPieces(movingPiece);
     }
 
     state.availableThrows.remove(moveValue);
 
-    state.availableThrows.remove(_extraTurnMarker);
+    state.availableThrows.remove(moveValue);
+
+    if (state.availableThrows.contains(_extraTurnMarker)) {
+      state.availableThrows.remove(_extraTurnMarker);
+      return;
+    }
 
     if (state.availableThrows.isEmpty) {
       _advanceTurn();
     }
 
     _validateAll();
+  }
+
+  List<Piece> _piecesMovingWith(Piece selectedPiece) {
+    if (!selectedPiece.isActive) {
+      return [selectedPiece];
+    }
+
+    return selectedPiece.owner.pieces.where((piece) {
+      return piece.isActive &&
+          piece.position == selectedPiece.position &&
+          !piece.completed;
+    }).toList();
   }
 
   void _movePieceForward(Piece piece, int moveValue) {
@@ -106,6 +139,22 @@ class Game implements GameEngine {
     );
 
     piece.position = destination;
+  }
+
+  void _captureOpponentPieces(Piece movedPiece) {
+    if (!movedPiece.isActive) return;
+
+    for (final player in state.players) {
+      if (player == movedPiece.owner) continue;
+
+      for (final opponentPiece in player.pieces) {
+        if (opponentPiece.position == movedPiece.position &&
+            !opponentPiece.completed) {
+          opponentPiece.position = null;
+          opponentPiece.previousStation = null;
+        }
+      }
+    }
   }
 
   void _validateMove(Piece piece, int moveValue) {
