@@ -1,10 +1,23 @@
 import 'piece.dart';
 
+enum PlayerType {
+  human,
+  computer,
+}
+
 class Player {
   final String name;
+  final PlayerType type;
   final List<Piece> pieces = [];
 
-  Player(this.name);
+  Player(
+    this.name, {
+    this.type = PlayerType.human,
+  });
+
+  bool get isHuman => type == PlayerType.human;
+
+  bool get isComputer => type == PlayerType.computer;
 
   void initializePieces() {
     if (pieces.isNotEmpty) return;

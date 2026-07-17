@@ -34,10 +34,7 @@ class Board {
     return List.unmodifiable(station.nextStationIds);
   }
 
-  MoveResult destination({
-    required int startId,
-    required int moveValue,
-  }) {
+  MoveResult destination({required int startId, required int moveValue}) {
     if (!isValidStation(startId)) {
       throw ArgumentError('Invalid start station: $startId');
     }
@@ -144,7 +141,11 @@ class Board {
 
   static Map<int, Station> _createStations() {
     return {
-      0: Station(id: 0, name: 'Start / bottom-right corner', nextStationIds: [1]),
+      0: Station(
+        id: 0,
+        name: 'Start / bottom-right corner',
+        nextStationIds: [1],
+      ),
 
       1: Station(id: 1, name: 'Right edge 1', nextStationIds: [2]),
       2: Station(id: 2, name: 'Right edge 2', nextStationIds: [3]),
@@ -170,14 +171,46 @@ class Board {
       18: Station(id: 18, name: 'Bottom edge 3', nextStationIds: [19]),
       19: Station(id: 19, name: 'Bottom edge 4', nextStationIds: [0]),
 
-      20: Station(id: 20, name: 'Top-right inner shortcut', nextStationIds: [21]),
-      21: Station(id: 21, name: 'Upper-right middle shortcut', nextStationIds: [28]),
-      22: Station(id: 22, name: 'Top-left inner shortcut', nextStationIds: [23]),
-      23: Station(id: 23, name: 'Upper-left middle shortcut', nextStationIds: [28]),
-      24: Station(id: 24, name: 'Bottom-right inner shortcut', nextStationIds: [0]),
-      25: Station(id: 25, name: 'Lower-right middle shortcut', nextStationIds: [24]),
-      26: Station(id: 26, name: 'Bottom-left inner shortcut', nextStationIds: [15]),
-      27: Station(id: 27, name: 'Lower-left middle shortcut', nextStationIds: [26]),
+      20: Station(
+        id: 20,
+        name: 'Top-right inner shortcut',
+        nextStationIds: [21],
+      ),
+      21: Station(
+        id: 21,
+        name: 'Upper-right middle shortcut',
+        nextStationIds: [28],
+      ),
+      22: Station(
+        id: 22,
+        name: 'Top-left inner shortcut',
+        nextStationIds: [23],
+      ),
+      23: Station(
+        id: 23,
+        name: 'Upper-left middle shortcut',
+        nextStationIds: [28],
+      ),
+      24: Station(
+        id: 24,
+        name: 'Bottom-right inner shortcut',
+        nextStationIds: [0],
+      ),
+      25: Station(
+        id: 25,
+        name: 'Lower-right middle shortcut',
+        nextStationIds: [24],
+      ),
+      26: Station(
+        id: 26,
+        name: 'Bottom-left inner shortcut',
+        nextStationIds: [15],
+      ),
+      27: Station(
+        id: 27,
+        name: 'Lower-left middle shortcut',
+        nextStationIds: [26],
+      ),
       28: Station(id: 28, name: 'Center station', nextStationIds: [25, 27]),
 
       /* Corrected shortcut path:

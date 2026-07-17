@@ -1,24 +1,41 @@
 import 'package:flutter/material.dart';
-
+import 'ai/easy_ai.dart';
 import 'board_widget.dart';
 import 'game.dart';
+import 'game_settings.dart';
 import 'piece.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final GameSettings settings;
+
+  const GameScreen({super.key, required this.settings});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  final Game engine = Game();
+  late final Game engine;
+
+  final EasyAi easyAi = EasyAi();
+
   String statusMessage = 'Tap "Throw Sticks" to begin.';
+  bool computerTurnInProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    engine = Game(gameSettings: widget.settings);
+  }
 
   bool _currentPlayerHasActivePiece() {
     for (final piece in engine.currentPlayer.pieces) {
-      if (piece.isActive) return true;
+      if (piece.isActive) {
+        return true;
+      }
     }
+
     return false;
   }
 
@@ -28,7 +45,9 @@ class _GameScreenState extends State<GameScreen> {
         continue;
       }
 
-      if (value != 0) return value;
+      if (value != 0) {
+        return value;
+      }
     }
 
     return null;
@@ -41,22 +60,35 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   String _throwLabel(int? value) {
-    if (value == null) return 'Throw Result: None';
-    if (value == Game.redXMove) return 'Throw Result: Red X — Move Back';
+    if (value == null) {
+      return 'Throw Result: None';
+    }
+
+    if (value == Game.redXMove) {
+      return 'Throw Result: Red X — Move Back';
+    }
+
     return 'Throw Result: $value';
   }
 
   void _throwSticks() {
+    if (engine.currentPlayer.isComputer || computerTurnInProgress) {
+      return;
+    }
+
     setState(() {
       final result = engine.throwSticks();
 
       if (result == Game.redXMove && !_currentPlayerHasActivePiece()) {
         engine.state.availableThrows.remove(Game.redXMove);
+
         statusMessage =
-            '${engine.currentPlayer.name} got Red X, but has no active pieces. Throw again.';
+            '${engine.currentPlayer.name} got Red X, '
+            'but has no active pieces. Throw again.';
       } else if (result == Game.redXMove) {
         statusMessage =
-            '${engine.currentPlayer.name} got Red X. Move an active piece backward.';
+            '${engine.currentPlayer.name} got Red X. '
+            'Move an active piece backward.';
       } else {
         statusMessage = '${engine.currentPlayer.name} rolled a $result.';
       }
@@ -64,8 +96,15 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _movePiece(Piece piece) {
+    if (engine.currentPlayer.isComputer || computerTurnInProgress) {
+      return;
+    }
+
     final moveValue = currentMoveValue;
-    if (moveValue == null) return;
+
+    if (moveValue == null) {
+      return;
+    }
 
     try {
       setState(() {
@@ -76,6 +115,95 @@ class _GameScreenState extends State<GameScreen> {
       setState(() {
         statusMessage = 'Invalid move.';
       });
+
+      return;
+    }
+
+    if (engine.currentPlayer.isComputer) {
+      _runComputerTurn();
+    }
+  }
+
+  Future<void> _runComputerTurn() async {
+    if (!engine.currentPlayer.isComputer || computerTurnInProgress) {
+      return;
+    }
+
+    computerTurnInProgress = true;
+
+    try {
+      while (mounted && engine.currentPlayer.isComputer) {
+        await Future.delayed(const Duration(milliseconds: 700));
+
+        if (!mounted) {
+          return;
+        }
+
+        final result = engine.throwSticks();
+
+        setState(() {
+          if (result == Game.redXMove) {
+            statusMessage = 'Computer rolled Red X.';
+          } else {
+            statusMessage = 'Computer rolled a $result.';
+          }
+        });
+
+        await Future.delayed(const Duration(milliseconds: 700));
+
+        if (!mounted) {
+          return;
+        }
+
+        final moveValue = currentMoveValue;
+
+        // Red X cannot be used when the computer has no active piece.
+        if (moveValue == null) {
+          setState(() {
+            engine.state.availableThrows.remove(Game.redXMove);
+            statusMessage = 'Computer had no piece that could use Red X.';
+          });
+
+          continue;
+        }
+
+        final selectedPiece = easyAi.choosePiece(engine, moveValue);
+
+        if (selectedPiece == null) {
+          setState(() {
+            engine.state.availableThrows.remove(moveValue);
+            statusMessage = 'Computer had no valid piece to move.';
+          });
+
+          continue;
+        }
+
+        try {
+          setState(() {
+            engine.movePiece(selectedPiece, moveValue);
+            statusMessage = 'Computer moved a piece.';
+          });
+        } catch (_) {
+          setState(() {
+            engine.state.availableThrows.remove(moveValue);
+            statusMessage = 'Computer could not complete the move.';
+          });
+        }
+
+        if (engine.currentPlayer.isComputer) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    } finally {
+      computerTurnInProgress = false;
+
+      if (mounted) {
+        setState(() {
+          if (!engine.currentPlayer.isComputer) {
+            statusMessage = '${engine.currentPlayer.name}, it is your turn.';
+          }
+        });
+      }
     }
   }
 
@@ -84,6 +212,16 @@ class _GameScreenState extends State<GameScreen> {
     final currentPlayer = engine.currentPlayer;
     final throwValue = currentMoveValue;
     final playerColor = _playerColor(currentPlayer.name);
+
+    final humanCanThrow =
+        throwValue == null &&
+        !currentPlayer.isComputer &&
+        !computerTurnInProgress;
+
+    final humanCanMove =
+        throwValue != null &&
+        !currentPlayer.isComputer &&
+        !computerTurnInProgress;
 
     return Scaffold(
       appBar: AppBar(
@@ -116,7 +254,7 @@ class _GameScreenState extends State<GameScreen> {
                     throwValue: throwValue,
                     sticks: engine.lastSticks,
                     statusMessage: statusMessage,
-                    onThrow: throwValue != null ? null : _throwSticks,
+                    onThrow: humanCanThrow ? _throwSticks : null,
                   ),
                   const SizedBox(height: 16),
                   Expanded(
@@ -125,7 +263,7 @@ class _GameScreenState extends State<GameScreen> {
                       pieces: currentPlayer.pieces,
                       onPieceTap: _movePiece,
                       playerColor: playerColor,
-                      canMove: throwValue != null,
+                      canMove: humanCanMove,
                     ),
                   ),
                 ],
@@ -141,10 +279,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: BoardWidget(
-                      engine: engine,
-                      onPieceTap: _movePiece,
-                    ),
+                    child: BoardWidget(engine: engine, onPieceTap: _movePiece),
                   ),
                 ),
               ),
@@ -261,15 +396,15 @@ class _StickDisplay extends StatelessWidget {
   final List<bool> sticks;
   final int? value;
 
-  const _StickDisplay({
-    required this.sticks,
-    required this.value,
-  });
+  const _StickDisplay({required this.sticks, required this.value});
 
   @override
   Widget build(BuildContext context) {
     if (value == null || sticks.isEmpty) {
-      return const Text('No throw yet', style: TextStyle(color: Colors.black54));
+      return const Text(
+        'No throw yet',
+        style: TextStyle(color: Colors.black54),
+      );
     }
 
     return Wrap(
@@ -286,8 +421,8 @@ class _StickDisplay extends StatelessWidget {
           decoration: BoxDecoration(
             color: isShowing
                 ? (isRedXStick && redXMove
-                    ? Colors.red.shade700
-                    : Colors.brown.shade700)
+                      ? Colors.red.shade700
+                      : Colors.brown.shade700)
                 : Colors.brown.shade200,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.brown.shade900),
@@ -348,6 +483,7 @@ class _PieceButtons extends StatelessWidget {
                   final piece = entry.value;
 
                   String label;
+
                   if (piece.completed) {
                     label = '✓ Piece ${index + 1}\nDone';
                   } else if (piece.position == null) {

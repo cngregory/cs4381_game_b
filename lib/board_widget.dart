@@ -73,10 +73,7 @@ class BoardWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7E6),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF6D4C41),
-          width: 4,
-        ),
+        border: Border.all(color: const Color(0xFF6D4C41), width: 4),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.22),
@@ -132,8 +129,8 @@ class _StationCircle extends StatelessWidget {
         color: isCenter
             ? const Color(0xFFFFD54F)
             : hasPieces
-                ? const Color(0xFFFFF3CD)
-                : Colors.white,
+            ? const Color(0xFFFFF3CD)
+            : Colors.white,
         shape: BoxShape.circle,
         border: Border.all(
           color: isCenter ? Colors.brown.shade800 : const Color(0xFF4E342E),
@@ -160,11 +157,7 @@ class _StationCircle extends StatelessWidget {
               ),
             ),
 
-          if (hasPieces)
-            _PieceStack(
-              pieces: pieces,
-              onPieceTap: onPieceTap,
-            ),
+          if (hasPieces) _PieceStack(pieces: pieces, onPieceTap: onPieceTap),
         ],
       ),
     );
@@ -175,10 +168,7 @@ class _PieceStack extends StatelessWidget {
   final List<Piece> pieces;
   final void Function(Piece piece) onPieceTap;
 
-  const _PieceStack({
-    required this.pieces,
-    required this.onPieceTap,
-  });
+  const _PieceStack({required this.pieces, required this.onPieceTap});
 
   @override
   Widget build(BuildContext context) {
@@ -197,10 +187,7 @@ class _PieceStack extends StatelessWidget {
             decoration: BoxDecoration(
               color: isPlayerOne ? Colors.red.shade700 : Colors.blue.shade700,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white,
-                width: 1.5,
-              ),
+              border: Border.all(color: Colors.white, width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.35),

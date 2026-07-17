@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cs4381_game_b_flutter/board.dart';
-import 'package:cs4381_game_b_flutter/game.dart';
-import 'package:cs4381_game_b_flutter/game_engine.dart';
-import 'package:cs4381_game_b_flutter/piece.dart';
+import 'package:cs4381_game_b/board.dart';
+import 'package:cs4381_game_b/game.dart';
+import 'package:cs4381_game_b/game_engine.dart';
+import 'package:cs4381_game_b/piece.dart';
 
 void main() {
   group('Category 1 — Functional Behavior', () {
@@ -77,7 +77,7 @@ void main() {
         expect(piece.position, 2);
         expect(game.state.availableThrows, [2]);
         expect(game.currentPlayer, isNotNull);
-      expect(game.currentPlayer!.name, 'Player 1');
+        expect(game.currentPlayer!.name, 'Player 1');
       },
     );
 
@@ -101,7 +101,8 @@ void main() {
       expect(
         game.currentPlayer.name,
         'Player 1',
-        reason: 'A result of 4 must preserve the current player for an extra turn.',
+        reason:
+            'A result of 4 must preserve the current player for an extra turn.',
       );
     });
 
@@ -116,15 +117,18 @@ void main() {
   });
 
   group('Category 2 — Edge Cases', () {
-    test('station 0 is a valid landing position and does not complete a piece', () {
-      final board = Board();
+    test(
+      'station 0 is a valid landing position and does not complete a piece',
+      () {
+        final board = Board();
 
-      final result = board.destination(startId: 19, moveValue: 1);
+        final result = board.destination(startId: 19, moveValue: 1);
 
-      expect(result.destination, Board.startStationId);
-      expect(result.completed, isFalse);
-      expect(result.previousStation, 19);
-    });
+        expect(result.destination, Board.startStationId);
+        expect(result.completed, isFalse);
+        expect(result.previousStation, 19);
+      },
+    );
 
     test('station 28 exits according to the path used to enter the center', () {
       final board = Board();
@@ -190,29 +194,32 @@ void main() {
       expect(opponent.previousStation, isNull);
     });
 
-    test('capturing a friendly stack of opponents resets every stacked piece', () {
-      final game = Game();
-      final attacker = game.state.players[0].pieces.first;
-      final opponent1 = game.state.players[1].pieces[0];
-      final opponent2 = game.state.players[1].pieces[1];
-      attacker
-        ..position = 1
-        ..previousStation = 0;
-      opponent1
-        ..position = 2
-        ..previousStation = 1;
-      opponent2
-        ..position = 2
-        ..previousStation = 1;
-      game.state.availableThrows.add(1);
+    test(
+      'capturing a friendly stack of opponents resets every stacked piece',
+      () {
+        final game = Game();
+        final attacker = game.state.players[0].pieces.first;
+        final opponent1 = game.state.players[1].pieces[0];
+        final opponent2 = game.state.players[1].pieces[1];
+        attacker
+          ..position = 1
+          ..previousStation = 0;
+        opponent1
+          ..position = 2
+          ..previousStation = 1;
+        opponent2
+          ..position = 2
+          ..previousStation = 1;
+        game.state.availableThrows.add(1);
 
-      game.movePiece(attacker, 1);
+        game.movePiece(attacker, 1);
 
-      expect(opponent1.isInactive, isTrue);
-      expect(opponent2.isInactive, isTrue);
-      expect(opponent1.previousStation, isNull);
-      expect(opponent2.previousStation, isNull);
-    });
+        expect(opponent1.isInactive, isTrue);
+        expect(opponent2.isInactive, isTrue);
+        expect(opponent1.previousStation, isNull);
+        expect(opponent2.previousStation, isNull);
+      },
+    );
 
     test(
       'consecutive red-X moves continue backward along the previously used path',
@@ -242,8 +249,10 @@ void main() {
       final board = Board();
 
       expect(board.stations, hasLength(29));
-      expect(board.stations.map((station) => station.id).toSet(),
-          Set<int>.from(List<int>.generate(29, (index) => index)));
+      expect(
+        board.stations.map((station) => station.id).toSet(),
+        Set<int>.from(List<int>.generate(29, (index) => index)),
+      );
       expect(() => board.validate(), returnsNormally);
     });
 
@@ -268,15 +277,21 @@ void main() {
       expect(() => piece.validate(board), throwsStateError);
     });
 
-    test('player-state invariant: every player has exactly four owned pieces', () {
-      final game = Game();
+    test(
+      'player-state invariant: every player has exactly four owned pieces',
+      () {
+        final game = Game();
 
-      for (final player in game.state.players) {
-        expect(player.pieces, hasLength(4));
-        expect(player.pieces.every((piece) => identical(piece.owner, player)), isTrue);
-        expect(() => player.validate(), returnsNormally);
-      }
-    });
+        for (final player in game.state.players) {
+          expect(player.pieces, hasLength(4));
+          expect(
+            player.pieces.every((piece) => identical(piece.owner, player)),
+            isTrue,
+          );
+          expect(() => player.validate(), returnsNormally);
+        }
+      },
+    );
 
     test('turn-state invariant holds after a valid move', () {
       final game = Game();
@@ -315,10 +330,7 @@ void main() {
       final beforePlayerIndex = game.state.currentPlayerIndex;
       final beforeThrows = List<int>.from(game.state.availableThrows);
 
-      expect(
-        () => game.movePiece(piece, Game.redXMove),
-        throwsStateError,
-      );
+      expect(() => game.movePiece(piece, Game.redXMove), throwsStateError);
 
       expect(piece.isInactive, isTrue);
       expect(piece.completed, isFalse);

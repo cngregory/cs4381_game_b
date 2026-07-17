@@ -1,4 +1,4 @@
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:cs4381_game_b/board.dart';
 
 void main() {
@@ -89,19 +89,22 @@ void main() {
       expect(board.destination(startId: 23, moveValue: 2).destination, 25);
     });
 
-    test('starting on center follows shortcut path and completes only past start', () {
-      final board = Board();
+    test(
+      'starting on center follows shortcut path and completes only past start',
+      () {
+        final board = Board();
 
-      expect(board.destination(startId: 28, moveValue: 1).destination, 25);
-      expect(board.destination(startId: 28, moveValue: 2).destination, 24);
+        expect(board.destination(startId: 28, moveValue: 1).destination, 25);
+        expect(board.destination(startId: 28, moveValue: 2).destination, 24);
 
-      final move3 = board.destination(startId: 28, moveValue: 3);
-      expect(move3.destination, 0);
-      expect(move3.completed, isFalse);
+        final move3 = board.destination(startId: 28, moveValue: 3);
+        expect(move3.destination, 0);
+        expect(move3.completed, isFalse);
 
-      expect(board.destination(startId: 28, moveValue: 4).completed, isTrue);
-      expect(board.destination(startId: 28, moveValue: 5).completed, isTrue);
-    });
+        expect(board.destination(startId: 28, moveValue: 4).completed, isTrue);
+        expect(board.destination(startId: 28, moveValue: 5).completed, isTrue);
+      },
+    );
   });
 
   group('Completion rules', () {

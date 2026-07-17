@@ -1,4 +1,4 @@
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:cs4381_game_b/game.dart';
 import 'package:cs4381_game_b/board.dart';
 
@@ -94,20 +94,14 @@ void main() {
 
       game.state.availableThrows.add(1);
 
-      expect(
-        () => game.movePiece(opponentPiece, 1),
-        throwsArgumentError,
-      );
+      expect(() => game.movePiece(opponentPiece, 1), throwsArgumentError);
     });
 
     test('cannot move without available throw', () {
       final game = Game();
       final piece = game.currentPlayer.pieces.first;
 
-      expect(
-        () => game.movePiece(piece, 1),
-        throwsArgumentError,
-      );
+      expect(() => game.movePiece(piece, 1), throwsArgumentError);
     });
 
     test('cannot move completed piece', () {
@@ -117,10 +111,7 @@ void main() {
       piece.completed = true;
       game.state.availableThrows.add(1);
 
-      expect(
-        () => game.movePiece(piece, 1),
-        throwsStateError,
-      );
+      expect(() => game.movePiece(piece, 1), throwsStateError);
     });
   });
 
@@ -131,10 +122,7 @@ void main() {
 
       player.pieces.removeLast();
 
-      expect(
-        () => player.validate(),
-        throwsStateError,
-      );
+      expect(() => player.validate(), throwsStateError);
     });
 
     test('piece invariant rejects invalid station', () {
@@ -144,10 +132,7 @@ void main() {
 
       piece.position = 99;
 
-      expect(
-        () => piece.validate(board),
-        throwsStateError,
-      );
+      expect(() => piece.validate(board), throwsStateError);
     });
   });
 }

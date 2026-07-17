@@ -35,7 +35,11 @@ class BoardPainter extends CustomPainter {
       final end = positions[connection[1]];
 
       if (start != null && end != null) {
-        canvas.drawLine(start.translate(2, 2), end.translate(2, 2), shadowPaint);
+        canvas.drawLine(
+          start.translate(2, 2),
+          end.translate(2, 2),
+          shadowPaint,
+        );
         canvas.drawLine(start, end, pathPaint);
       }
     }

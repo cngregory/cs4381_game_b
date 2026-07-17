@@ -1,5 +1,5 @@
 import 'dart:math';
-
+import 'game_settings.dart';
 import 'board.dart';
 import 'game_engine.dart';
 import 'game_state.dart';
@@ -9,6 +9,7 @@ import 'player.dart';
 class Game implements GameEngine {
   final Board _board = Board();
   final Random _random = Random();
+  final GameSettings settings;
 
   static const int redXMove = -1;
   static const int _extraTurnMarker = 0;
@@ -18,9 +19,15 @@ class Game implements GameEngine {
   @override
   late final GameState state;
 
-  Game() {
+  Game({GameSettings? gameSettings})
+    : settings = gameSettings ?? GameSettings(mode: GameMode.humanVsHuman) {
     final player1 = Player("Player 1");
-    final player2 = Player("Player 2");
+    final player2 = Player(
+      settings.mode == GameMode.humanVsComputer ? "Computer" : "Player 2",
+      type: settings.mode == GameMode.humanVsComputer
+          ? PlayerType.computer
+          : PlayerType.human,
+    );
 
     player1.initializePieces();
     player2.initializePieces();
@@ -75,8 +82,6 @@ class Game implements GameEngine {
     for (final movingPiece in movingPieces) {
       _captureOpponentPieces(movingPiece);
     }
-
-    state.availableThrows.remove(moveValue);
 
     state.availableThrows.remove(moveValue);
 
@@ -176,6 +181,83 @@ class Game implements GameEngine {
     if (!isForwardMove && !isBackwardMove) {
       throw ArgumentError('Move value must be 1-5 or red-X.');
     }
+  }
+
+  List<Piece> legalPiecesFor(int moveValue) {
+    return currentPlayer.pieces.where((piece) {
+      if (piece.completed) {
+        return false;
+      }
+
+      if (moveValue == redXMove) {
+        return piece.isActive && piece.previousStation != null;
+      }
+
+      return moveValue >= 1 && moveValue <= 5;
+    }).toList();
+  }
+
+  bool wouldComplete(Piece piece, int moveValue) {
+    if (piece.completed || moveValue == redXMove) {
+      return false;
+    }
+
+    final startPosition = piece.isInactive
+        ? Board.startStationId
+        : piece.position!;
+
+    final result = _board.destination(
+      startId: startPosition,
+      moveValue: moveValue,
+    );
+
+    return result.completed;
+  }
+
+  bool wouldCapture(Piece piece, int moveValue) {
+    if (piece.completed || moveValue == redXMove) {
+      return false;
+    }
+
+    final startPosition = piece.isInactive
+        ? Board.startStationId
+        : piece.position!;
+
+    final result = _board.destination(
+      startId: startPosition,
+      moveValue: moveValue,
+    );
+
+    if (result.completed) {
+      return false;
+    }
+
+    for (final player in state.players) {
+      if (player == piece.owner) {
+        continue;
+      }
+
+      for (final opponentPiece in player.pieces) {
+        if (opponentPiece.isActive &&
+            opponentPiece.position == result.destination) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  int stackSize(Piece selectedPiece) {
+    if (!selectedPiece.isActive) {
+      return 1;
+    }
+
+    return selectedPiece.owner.pieces.where((piece) {
+      return piece.isActive &&
+          piece.position == selectedPiece.position &&
+          !piece.completed;
+    }).length;
   }
 
   void _advanceTurn() {

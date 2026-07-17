@@ -20,8 +20,7 @@ class GameState {
       throw StateError('Game must have exactly two players.');
     }
 
-    if (currentPlayerIndex < 0 ||
-        currentPlayerIndex >= players.length) {
+    if (currentPlayerIndex < 0 || currentPlayerIndex >= players.length) {
       throw StateError('Current player index is invalid.');
     }
 
