@@ -1,0 +1,259 @@
+@startuml
+title Game B — Model-Driven Domain Class Diagram
+
+left to right direction
+
+skinparam classAttributeIconSize 0
+skinparam linetype polyline
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+hide circle
+hide empty members
+
+' ============================================================
+' GAME CONTROL
+' ============================================================
+
+package "Game Control" {
+
+  interface GameEngine {
+    + getState() : GameState
+    + getCurrentPlayer() : Player
+    + throwSticks() : Integer
+    + movePiece(piece : Piece, moveValue : Integer) : MoveResult
+    + legalPiecesFor(moveValue : Integer) : Sequence<Piece>
+  }
+
+  class Game {
+    {static} + NUMBER_OF_PLAYERS : Integer = 2
+    {static} + PIECES_PER_PLAYER : Integer = 4
+    {static} + NUMBER_OF_STICKS : Integer = 4
+    {static} + MIN_MOVE_VALUE : Integer = 1
+    {static} + MAX_MOVE_VALUE : Integer = 5
+    {static} + RED_X_MOVE : Integer = -1
+
+    - board : Board
+    - state : GameState
+    - lastSticks : Sequence<StickResult>
+
+    + Game()
+    + getState() : GameState
+    + getBoard() : Board
+    + getCurrentPlayer() : Player
+    + getLastSticks() : Sequence<StickResult>
+    + throwSticks() : Integer
+    + movePiece(piece : Piece, moveValue : Integer) : MoveResult
+    + legalPiecesFor(moveValue : Integer) : Sequence<Piece>
+    + isWinner(player : Player) : Boolean
+    + validate() : void
+
+    - resolveCapture(movedPieces : Sequence<Piece>) : Sequence<Piece>
+    - resolveFriendlyStack(piece : Piece) : Sequence<Piece>
+    - grantExtraThrow(reason : ExtraThrowReason) : void
+    - endTurnIfRequired() : void
+  }
+
+  class GameState {
+    - players : Sequence<Player>
+    - currentPlayerIndex : Integer
+    - availableThrows : Sequence<Integer>
+    - extraThrowPending : Boolean
+    - gameOver : Boolean
+    - winner : Player [0..1]
+
+    + GameState(players : Sequence<Player>)
+    + getPlayers() : Sequence<Player>
+    + getCurrentPlayerIndex() : Integer
+    + getCurrentPlayer() : Player
+    + getAvailableThrows() : Sequence<Integer>
+    + isExtraThrowPending() : Boolean
+    + isGameOver() : Boolean
+    + getWinner() : Player [0..1]
+    + addAvailableThrow(moveValue : Integer) : void
+    + consumeOneThrow(moveValue : Integer) : void
+    + markExtraThrowPending() : void
+    + clearExtraThrowPending() : void
+    + advancePlayer() : void
+    + declareWinner(player : Player) : void
+    + validate() : void
+  }
+
+  enum ExtraThrowReason {
+    ZERO_FLAT_STICKS
+    FOUR_FLAT_STICKS
+    CAPTURE
+  }
+
+  class StickResult {
+    - flatSideUp : Boolean
+    - redX : Boolean
+
+    + StickResult(flatSideUp : Boolean, redX : Boolean)
+    + isFlatSideUp() : Boolean
+    + hasRedX() : Boolean
+  }
+}
+
+' ============================================================
+' PLAYER DOMAIN
+' ============================================================
+
+package "Players and Pieces" {
+
+  class Player {
+    - name : String
+    - pieces : Sequence<Piece>
+
+    + Player(name : String)
+    + getName() : String
+    + getPieces() : Sequence<Piece>
+    + activePieces() : Sequence<Piece>
+    + finishedPieces() : Sequence<Piece>
+    + piecesAt(stationId : Integer) : Sequence<Piece>
+    + hasWon() : Boolean
+    + validate() : void
+  }
+
+  class Piece {
+    - owner : Player
+    - position : Integer [0..1]
+    - previousStation : Integer [0..1]
+    - completed : Boolean
+
+    + Piece(owner : Player)
+    + getOwner() : Player
+    + getPosition() : Integer [0..1]
+    + getPreviousStation() : Integer [0..1]
+    + isInactive() : Boolean
+    + isActive() : Boolean
+    + isCompleted() : Boolean
+    + enterBoard(destination : Integer, previousStation : Integer) : void
+    + moveTo(destination : Integer, previousStation : Integer) : void
+    + moveBackwardTo(destination : Integer) : void
+    + complete() : void
+    + resetToStart() : void
+    + validate(board : Board) : void
+  }
+}
+
+' ============================================================
+' BOARD DOMAIN
+' ============================================================
+
+package "Board and Movement" {
+
+  class Board {
+    {static} + STATION_COUNT : Integer = 29
+    {static} + START_STATION_ID : Integer = 0
+    {static} + MIN_STATION_ID : Integer = 0
+    {static} + MAX_STATION_ID : Integer = STATION_COUNT - 1
+    {static} + MIN_FORWARD_MOVE : Integer = 1
+    {static} + MAX_FORWARD_MOVE : Integer = 5
+    {static} + RIGHT_SHORTCUT_ENTRY_ID : Integer = 5
+    {static} + LEFT_SHORTCUT_ENTRY_ID : Integer = 10
+    {static} + CENTER_STATION_ID : Integer = 28
+
+    - stations : Sequence<Station>
+
+    + Board()
+    + getStations() : Sequence<Station>
+    + getStation(id : Integer) : Station
+    + isValidStation(id : Integer) : Boolean
+    + nextStationsFrom(id : Integer) : Sequence<Integer>
+    + destination(startId : Integer, moveValue : Integer) : MoveResult
+    + moveBackward(currentStation : Integer, previousStation : Integer) : Integer
+    + validate() : void
+  }
+
+  class Station {
+    - id : Integer
+    - name : String
+    - nextStationIds : Sequence<Integer>
+
+    + Station(
+        id : Integer,
+        name : String,
+        nextStationIds : Sequence<Integer>
+      )
+    + getId() : Integer
+    + getName() : String
+    + getNextStationIds() : Sequence<Integer>
+  }
+
+  class MoveResult {
+    - destination : Integer [0..1]
+    - previousStation : Integer [0..1]
+    - completed : Boolean
+    - movedPieces : Sequence<Piece>
+    - capturedPieces : Sequence<Piece>
+    - captureOccurred : Boolean
+    - extraThrowGranted : Boolean
+
+    + MoveResult(
+        destination : Integer [0..1],
+        previousStation : Integer [0..1],
+        completed : Boolean,
+        movedPieces : Sequence<Piece>,
+        capturedPieces : Sequence<Piece>,
+        captureOccurred : Boolean,
+        extraThrowGranted : Boolean
+      )
+    + getDestination() : Integer [0..1]
+    + getPreviousStation() : Integer [0..1]
+    + isCompleted() : Boolean
+    + getMovedPieces() : Sequence<Piece>
+    + getCapturedPieces() : Sequence<Piece>
+    + didCaptureOccur() : Boolean
+    + wasExtraThrowGranted() : Boolean
+  }
+}
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+
+GameEngine <|.. Game : realizes
+
+Game "1" *-- "1" Board : board
+Game "1" *-- "1" GameState : state
+Game "1" *-- "0..4" StickResult : lastSticks
+
+GameState "1" *-- "2 players" Player
+GameState "1" --> "0..1 winner" Player
+
+Player "1 owner" *-- "4 pieces" Piece
+
+Board "1" *-- "29 stations" Station
+Station "0..*" --> "0..*" Station : nextStations
+
+Game ..> MoveResult : creates
+Board ..> MoveResult : calculates
+Game ..> ExtraThrowReason : uses
+Game ..> Piece : moves
+Piece ..> Board : validates against
+
+' ============================================================
+' SHORT NOTES
+' ============================================================
+
+note bottom of Game
+  Exactly four sticks are thrown.
+  Results 0, 4, and captures grant an extra throw.
+  One move consumes exactly one available throw.
+end note
+
+note bottom of Piece
+  previousStation preserves path history
+  for consecutive red-X backward moves.
+end note
+
+note bottom of Board
+  The board contains exactly 29 stations.
+  Shortcuts activate only when movement
+  begins on a shortcut-entry station.
+end note
+
+@enduml

@@ -1,0 +1,965 @@
+------------------------------------------------------------
+-- GAME B FORMAL OCL SPECIFICATION
+--
+-- Primary constrained classes:
+--   1. Board
+--   2. Game
+--
+-- Supporting constraints:
+--   Player, Piece, GameState, Station, MoveResult
+------------------------------------------------------------
+
+-------------------------------------------------------------------
+-- HW3 Failure 1:
+-- Duplicate available throws were both removed.
+-- Prevented by:
+--   MoveConsumesExactlyOneMatchingThrow
+--   MovePreservesEveryOtherThrow
+
+-- HW3 Failure 2:
+-- A move value of 4 incorrectly changed the player.
+-- Prevented by:
+--   MoveFourGrantsExtraThrow
+--   MoveFourPreservesCurrentPlayer
+
+-- HW3 Failure 3:
+-- Five physical sticks were generated.
+-- Prevented by:
+--   GameLastSticksAreEmptyOrExactCount
+--   ThrowCreatesExactPhysicalStickCount
+
+-- HW3 Failure 4:
+-- Consecutive red-X movement used stale previousStation state.
+-- Prevented by:
+--   RedXMovesToPreviousStation
+--   RedXUpdatesMovementHistory
+------------------------------------------------------------------
+
+============================================================
+BOARD DEFINITIONS
+============================================================
+
+context Board
+
+def: minStationId : Integer =
+    self.MIN_STATION_ID
+
+def: maxStationId : Integer =
+    self.MAX_STATION_ID
+
+def: validForwardMoves : Set(Integer) =
+    Set{
+        self.MIN_FORWARD_MOVE..
+        self.MAX_FORWARD_MOVE
+    }
+
+def: shortcutEntryIds : Set(Integer) =
+    Set{
+        self.RIGHT_SHORTCUT_ENTRY_ID,
+        self.LEFT_SHORTCUT_ENTRY_ID
+    }
+
+
+============================================================
+BOARD INVARIANTS
+============================================================
+
+-- Category 1: Structural invariant
+context Board
+
+inv BoardExactStationCount:
+    self.stations->size() = self.STATION_COUNT
+
+
+-- Category 1: Structural invariant
+context Board
+
+inv BoardStationIdsAreUnique:
+    self.stations->isUnique(s | s.id)
+
+
+-- Category 1: Structural invariant
+context Board
+
+inv BoardContainsCompleteStationRange:
+    self.stations->forAll(s |
+        s.id >= self.minStationId and
+        s.id <= self.maxStationId
+    )
+    and
+    Sequence{
+        self.minStationId..
+        self.maxStationId
+    }->forAll(id |
+        self.stations->exists(s | s.id = id)
+    )
+
+
+-- Category 2: Graph integrity invariant
+context Board
+
+inv BoardConnectionsReferenceExistingStations:
+    self.stations->forAll(s |
+        s.nextStationIds->forAll(nextId |
+            self.stations->exists(nextStation |
+                nextStation.id = nextId
+            )
+        )
+    )
+
+
+-- Category 2: Graph integrity invariant
+context Board
+
+inv BoardStationsDoNotConnectToThemselves:
+    self.stations->forAll(s |
+        not s.nextStationIds->includes(s.id)
+    )
+
+
+-- Category 3: Boundary invariant
+context Board
+
+inv BoardStartStationIsValid:
+    self.stations->exists(s |
+        s.id = self.START_STATION_ID
+    )
+
+
+-- Category 3: Boundary invariant
+context Board
+
+inv BoardShortcutStationsAreValid:
+    self.stations->exists(s |
+        s.id = self.RIGHT_SHORTCUT_ENTRY_ID
+    )
+    and
+    self.stations->exists(s |
+        s.id = self.LEFT_SHORTCUT_ENTRY_ID
+    )
+    and
+    self.stations->exists(s |
+        s.id = self.CENTER_STATION_ID
+    )
+
+
+-- Category 4: Movement-path invariant
+context Board
+
+inv BoardEveryNonTerminalStationHasNextStation:
+    self.stations->forAll(s |
+        s.id <> self.START_STATION_ID
+        implies
+        s.nextStationIds->notEmpty()
+    )
+
+
+-- Category 4: Movement-path invariant
+context Board
+
+inv BoardShortcutEntriesBranch:
+    self.stations
+        ->select(s |
+            self.shortcutEntryIds->includes(s.id)
+        )
+        ->forAll(s |
+            s.nextStationIds->size() >= 2
+        )
+
+
+============================================================
+BOARD QUERY CONTRACTS
+============================================================
+
+context Board::getStations() : Sequence(Station)
+
+post GetStationsReturnsAllStations:
+    result = self.stations
+
+post GetStationsReturnsExactCount:
+    result->size() = self.STATION_COUNT
+
+
+------------------------------------------------------------
+
+context Board::getStation(id : Integer) : Station
+
+pre GetStationIdIsValid:
+    self.isValidStation(id)
+
+post GetStationReturnsRequestedStation:
+    result.id = id
+
+post GetStationBelongsToBoard:
+    self.stations->includes(result)
+
+
+------------------------------------------------------------
+
+context Board::isValidStation(id : Integer) : Boolean
+
+post IsValidStationIsCorrect:
+    result =
+        self.stations->exists(s |
+            s.id = id
+        )
+
+
+------------------------------------------------------------
+
+context Board::nextStationsFrom(
+    id : Integer
+) : Sequence(Integer)
+
+pre NextStationsSourceExists:
+    self.isValidStation(id)
+
+post NextStationsReturnsStoredConnections:
+    result =
+        self.stations
+            ->any(s | s.id = id)
+            .nextStationIds
+
+post NextStationsAreAllValid:
+    result->forAll(nextId |
+        self.isValidStation(nextId)
+    )
+
+
+============================================================
+BOARD FORWARD-MOVEMENT CONTRACT
+============================================================
+
+context Board::destination(
+    startId : Integer,
+    moveValue : Integer
+) : MoveResult
+
+pre DestinationStartStationIsValid:
+    self.isValidStation(startId)
+
+pre DestinationMoveValueIsValid:
+    self.validForwardMoves->includes(moveValue)
+
+post DestinationResultExists:
+    not result.oclIsUndefined()
+
+post DestinationCompletedHasNoBoardPosition:
+    result.completed
+    implies
+    result.destination.oclIsUndefined()
+
+post DestinationIncompleteHasValidPosition:
+    not result.completed
+    implies
+    (
+        not result.destination.oclIsUndefined()
+        and
+        self.isValidStation(result.destination)
+    )
+
+post DestinationPreviousStationIsValid:
+    not result.previousStation.oclIsUndefined()
+    implies
+    self.isValidStation(result.previousStation)
+
+post LandingOnStartDoesNotCompleteLap:
+    result.destination = self.START_STATION_ID
+    implies
+    not result.completed
+
+post CompletedMoveLeavesBoard:
+    result.completed
+    implies
+    result.destination.oclIsUndefined()
+
+
+============================================================
+BOARD BACKWARD-MOVEMENT CONTRACT
+============================================================
+
+context Board::moveBackward(
+    currentStation : Integer,
+    previousStation : Integer
+) : Integer
+
+pre BackwardCurrentStationIsValid:
+    self.isValidStation(currentStation)
+
+pre BackwardPreviousStationIsValid:
+    self.isValidStation(previousStation)
+
+pre BackwardStationsAreConnected:
+    self.nextStationsFrom(previousStation)
+        ->includes(currentStation)
+
+pre BackwardStationsAreDistinct:
+    currentStation <> previousStation
+
+post BackwardReturnsPreviousStation:
+    result = previousStation
+
+post BackwardResultIsValid:
+    self.isValidStation(result)
+
+
+============================================================
+BOARD VALIDATION CONTRACT
+============================================================
+
+context Board::validate() : OclVoid
+
+pre BoardExistsBeforeValidation:
+    not self.oclIsUndefined()
+
+post ValidationPreservesStations:
+    self.stations = self.stations@pre
+
+post ValidationEstablishesStationCount:
+    self.stations->size() = self.STATION_COUNT
+
+
+============================================================
+GAME DEFINITIONS
+============================================================
+
+context Game
+
+def: minForwardMove : Integer =
+    self.MIN_MOVE_VALUE
+
+def: maxForwardMove : Integer =
+    self.MAX_MOVE_VALUE
+
+def: validMoveValues : Set(Integer) =
+    Set{
+        self.RED_X_MOVE,
+        self.MIN_MOVE_VALUE..
+        self.MAX_MOVE_VALUE
+    }
+
+def: allPieces : Set(Piece) =
+    self.state.players.pieces->flatten()->asSet()
+
+def: currentPlayer : Player =
+    self.state.currentPlayer
+
+def: opponentPlayers : Set(Player) =
+    self.state.players
+        ->excluding(self.currentPlayer)
+        ->asSet()
+
+
+============================================================
+GAME INVARIANTS
+============================================================
+
+-- Player-state category
+context Game
+
+inv GameHasExactNumberOfPlayers:
+    self.state.players->size() =
+    self.NUMBER_OF_PLAYERS
+
+
+-- Player-state category
+context Game
+
+inv GamePlayersHaveCorrectPieceCount:
+    self.state.players->forAll(player |
+        player.pieces->size() =
+        self.PIECES_PER_PLAYER
+    )
+
+
+-- Player-state category
+context Game
+
+inv GamePiecesHaveCorrectOwners:
+    self.state.players->forAll(player |
+        player.pieces->forAll(piece |
+            piece.owner = player
+        )
+    )
+
+
+-- Piece-state category
+context Game
+
+inv GamePieceStatesAreValid:
+    self.allPieces->forAll(piece |
+        (
+            piece.position.oclIsUndefined()
+            and
+            not piece.completed
+        )
+        or
+        (
+            not piece.position.oclIsUndefined()
+            and
+            not piece.completed
+            and
+            self.board.isValidStation(piece.position)
+        )
+        or
+        (
+            piece.position.oclIsUndefined()
+            and
+            piece.completed
+        )
+    )
+
+
+-- Piece-state category
+context Game
+
+inv GameCompletedPiecesAreOffBoard:
+    self.allPieces->forAll(piece |
+        piece.completed
+        implies
+        piece.position.oclIsUndefined()
+    )
+
+
+-- Piece-state category
+context Game
+
+inv GameActivePieceHistoryIsValid:
+    self.allPieces->forAll(piece |
+        not piece.previousStation.oclIsUndefined()
+        implies
+        self.board.isValidStation(
+            piece.previousStation
+        )
+    )
+
+
+-- Turn-state category
+context Game
+
+inv GameCurrentPlayerIndexIsValid:
+    self.state.currentPlayerIndex >= 0
+    and
+    self.state.currentPlayerIndex <
+        self.NUMBER_OF_PLAYERS
+
+
+-- Turn-state category
+context Game
+
+inv GameAvailableThrowsAreValid:
+    self.state.availableThrows->forAll(value |
+        self.validMoveValues->includes(value)
+    )
+
+
+-- Turn-state category
+context Game
+
+inv GameAvailableThrowsPreserveDuplicates:
+    self.state.availableThrows.oclIsKindOf(
+        Sequence(Integer)
+    )
+
+
+-- Physical-state category
+context Game
+
+inv GameLastSticksAreEmptyOrExactCount:
+    self.lastSticks->isEmpty()
+    or
+    self.lastSticks->size() =
+        self.NUMBER_OF_STICKS
+
+
+-- Physical-state category
+context Game
+
+inv GameHasAtMostOneRedXStick:
+    self.lastSticks
+        ->select(stick | stick.redX)
+        ->size() <= 1
+
+
+-- Winner-state category
+context Game
+
+inv GameWinnerHasAllPiecesCompleted:
+    not self.state.winner.oclIsUndefined()
+    implies
+    self.state.winner.pieces->forAll(piece |
+        piece.completed
+    )
+
+
+============================================================
+GAME QUERY CONTRACTS
+============================================================
+
+context Game::getState() : GameState
+
+post GetStateReturnsOwnedState:
+    result = self.state
+
+
+------------------------------------------------------------
+
+context Game::getBoard() : Board
+
+post GetBoardReturnsOwnedBoard:
+    result = self.board
+
+
+------------------------------------------------------------
+
+context Game::getCurrentPlayer() : Player
+
+post GetCurrentPlayerUsesCurrentIndex:
+    result =
+        self.state.players
+            ->at(
+                self.state.currentPlayerIndex + 1
+            )
+
+
+------------------------------------------------------------
+
+context Game::getLastSticks() : Sequence(StickResult)
+
+post GetLastSticksReturnsStoredResults:
+    result = self.lastSticks
+
+
+------------------------------------------------------------
+
+context Game::legalPiecesFor(
+    moveValue : Integer
+) : Sequence(Piece)
+
+pre LegalPiecesMoveValueIsValid:
+    self.validMoveValues->includes(moveValue)
+
+post LegalPiecesBelongToCurrentPlayer:
+    result->forAll(piece |
+        piece.owner = self.currentPlayer
+    )
+
+post RedXRequiresActivePieces:
+    moveValue = self.RED_X_MOVE
+    implies
+    result->forAll(piece |
+        piece.isActive()
+    )
+
+post ForwardMoveExcludesCompletedPieces:
+    moveValue <> self.RED_X_MOVE
+    implies
+    result->forAll(piece |
+        not piece.completed
+    )
+
+
+------------------------------------------------------------
+
+context Game::isWinner(
+    player : Player
+) : Boolean
+
+pre WinnerCandidateBelongsToGame:
+    self.state.players->includes(player)
+
+post WinnerResultIsCorrect:
+    result =
+        player.pieces->forAll(piece |
+            piece.completed
+        )
+
+
+============================================================
+THROW-STICKS CONTRACT
+============================================================
+
+context Game::throwSticks() : Integer
+
+pre ThrowGameIsNotOver:
+    not self.state.gameOver
+
+post ThrowCreatesExactPhysicalStickCount:
+    self.lastSticks->size() =
+        self.NUMBER_OF_STICKS
+
+post ThrowResultIsValid:
+    self.validMoveValues->includes(result)
+
+post ThrowAddsExactlyOneMoveValue:
+    self.state.availableThrows->count(result) =
+        self.state.availableThrows@pre
+            ->count(result) + 1
+
+post ThrowPreservesExistingThrowOccurrences:
+    self.state.availableThrows@pre
+        ->asSet()
+        ->forAll(value |
+            self.state.availableThrows
+                ->count(value) >=
+            self.state.availableThrows@pre
+                ->count(value)
+        )
+
+post ZeroFlatSticksMapsToFive:
+    self.lastSticks
+        ->select(stick | stick.flatSideUp)
+        ->isEmpty()
+    implies
+    result = self.MAX_MOVE_VALUE
+
+post FourFlatSticksMapsToFour:
+    self.lastSticks
+        ->select(stick | stick.flatSideUp)
+        ->size() =
+        self.NUMBER_OF_STICKS
+    implies
+    result = self.NUMBER_OF_STICKS
+
+post RedXOnlyFlatStickMovesBackward:
+    (
+        self.lastSticks
+            ->select(stick | stick.flatSideUp)
+            ->size() = 1
+        and
+        self.lastSticks
+            ->exists(stick |
+                stick.flatSideUp and stick.redX
+            )
+    )
+    implies
+    result = self.RED_X_MOVE
+
+
+============================================================
+MOVE-PIECE PRECONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+pre MoveGameIsNotOver:
+    not self.state.gameOver
+
+pre MovePieceBelongsToCurrentPlayer:
+    piece.owner = self.currentPlayer
+
+pre MovePieceIsOwnedByGame:
+    self.allPieces->includes(piece)
+
+pre MovePieceIsNotCompleted:
+    not piece.completed
+
+pre MoveValueIsValid:
+    self.validMoveValues->includes(moveValue)
+
+pre MoveValueIsAvailable:
+    self.state.availableThrows
+        ->includes(moveValue)
+
+pre RedXRequiresActivePiece:
+    moveValue = self.RED_X_MOVE
+    implies
+    piece.isActive()
+
+
+============================================================
+MOVE-PIECE GENERAL POSTCONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post MoveConsumesExactlyOneMatchingThrow:
+    self.state.availableThrows
+        ->count(moveValue) =
+    self.state.availableThrows@pre
+        ->count(moveValue) - 1
+
+post MovePreservesEveryOtherThrow:
+    self.state.availableThrows@pre
+        ->asSet()
+        ->excluding(moveValue)
+        ->forAll(value |
+            self.state.availableThrows
+                ->count(value) =
+            self.state.availableThrows@pre
+                ->count(value)
+        )
+
+post MoveResultContainsSelectedPiece:
+    result.movedPieces->includes(piece)
+
+post MovedPiecesBelongToSamePlayer:
+    result.movedPieces->forAll(movedPiece |
+        movedPiece.owner = piece.owner
+    )
+
+post MovedPiecesRemainValid:
+    result.movedPieces->forAll(movedPiece |
+        movedPiece.completed
+        or
+        (
+            not movedPiece.position
+                .oclIsUndefined()
+            and
+            self.board.isValidStation(
+                movedPiece.position
+            )
+        )
+    )
+
+
+============================================================
+RED-X POSTCONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post RedXMovesToPreviousStation:
+    moveValue = self.RED_X_MOVE
+    implies
+    piece.position =
+        piece.previousStation@pre
+
+post RedXUpdatesMovementHistory:
+    moveValue = self.RED_X_MOVE
+    implies
+    piece.previousStation =
+        piece.position@pre
+
+post RedXDoesNotCompletePiece:
+    moveValue = self.RED_X_MOVE
+    implies
+    not piece.completed
+
+
+============================================================
+STACKING POSTCONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post FriendlyPiecesAtStartMoveTogether:
+    result.movedPieces->forAll(movedPiece |
+        movedPiece.position =
+            piece.position
+        or
+        movedPiece.completed
+    )
+
+post FriendlyStackHasSingleOwner:
+    result.movedPieces->forAll(movedPiece |
+        movedPiece.owner = piece.owner
+    )
+
+
+============================================================
+CAPTURE POSTCONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post CaptureFlagMatchesCapturedPieces:
+    result.captureOccurred =
+        result.capturedPieces->notEmpty()
+
+post CapturedPiecesBelongToOpponent:
+    result.capturedPieces->forAll(
+        capturedPiece |
+        capturedPiece.owner <>
+            piece.owner
+    )
+
+post CapturedPiecesReturnToStartState:
+    result.capturedPieces->forAll(
+        capturedPiece |
+        capturedPiece.position
+            .oclIsUndefined()
+        and
+        not capturedPiece.completed
+    )
+
+post CapturedStackEntirelyReturnsToStart:
+    result.captureOccurred
+    implies
+    result.capturedPieces->forAll(
+        capturedPiece |
+        capturedPiece.isInactive()
+    )
+
+post CaptureGrantsExtraThrow:
+    result.captureOccurred
+    implies
+    result.extraThrowGranted
+
+post CapturePreservesCurrentPlayer:
+    result.captureOccurred
+    implies
+    self.state.currentPlayerIndex =
+        self.state.currentPlayerIndex@pre
+
+
+============================================================
+OTHER EXTRA-TURN POSTCONDITIONS
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post MoveFourGrantsExtraThrow:
+    moveValue = self.NUMBER_OF_STICKS
+    implies
+    result.extraThrowGranted
+
+post MoveFourPreservesCurrentPlayer:
+    moveValue = self.NUMBER_OF_STICKS
+    implies
+    self.state.currentPlayerIndex =
+        self.state.currentPlayerIndex@pre
+
+post MoveFiveGrantsExtraThrow:
+    moveValue = self.MAX_MOVE_VALUE
+    implies
+    result.extraThrowGranted
+
+post MoveFivePreservesCurrentPlayer:
+    moveValue = self.MAX_MOVE_VALUE
+    implies
+    self.state.currentPlayerIndex =
+        self.state.currentPlayerIndex@pre
+
+
+============================================================
+NORMAL TURN-CHANGE POSTCONDITION
+============================================================
+
+context Game::movePiece(
+    piece : Piece,
+    moveValue : Integer
+) : MoveResult
+
+post NormalMoveChangesPlayerWhenNoThrowsRemain:
+    (
+        not result.extraThrowGranted
+        and
+        self.state.availableThrows->isEmpty()
+    )
+    implies
+    self.state.currentPlayerIndex =
+        (
+            self.state.currentPlayerIndex@pre + 1
+        ).mod(self.NUMBER_OF_PLAYERS)
+
+
+============================================================
+GAME VALIDATION CONTRACT
+============================================================
+
+context Game::validate() : OclVoid
+
+pre GameExistsBeforeValidation:
+    not self.oclIsUndefined()
+
+post ValidationPreservesBoard:
+    self.board = self.board@pre
+
+post ValidationPreservesPlayers:
+    self.state.players =
+        self.state.players@pre
+
+post ValidationEstablishesPlayerCount:
+    self.state.players->size() =
+        self.NUMBER_OF_PLAYERS
+
+post ValidationEstablishesPieceCounts:
+    self.state.players->forAll(player |
+        player.pieces->size() =
+            self.PIECES_PER_PLAYER
+    )
+
+
+============================================================
+SUPPORTING PLAYER CONSTRAINTS
+============================================================
+
+context Player
+
+inv PlayerHasCorrectNumberOfPieces:
+    self.pieces->size() =
+        Game::PIECES_PER_PLAYER
+
+inv PlayerOwnsEveryPiece:
+    self.pieces->forAll(piece |
+        piece.owner = self
+    )
+
+derive Player::finishedPieces :
+    Sequence(Piece) =
+        self.pieces
+            ->select(piece | piece.completed)
+
+derive Player::activePieces :
+    Sequence(Piece) =
+        self.pieces
+            ->select(piece | piece.isActive())
+
+context Player::hasWon() : Boolean
+
+post PlayerWinsOnlyWhenAllPiecesComplete:
+    result =
+        self.pieces->forAll(piece |
+            piece.completed
+        )
+
+
+============================================================
+SUPPORTING PIECE CONSTRAINTS
+============================================================
+
+context Piece
+
+inv PieceCannotBeCompletedAndActive:
+    self.completed
+    implies
+    self.position.oclIsUndefined()
+
+inv PieceActiveMeansOnBoard:
+    self.isActive()
+    implies
+    not self.position.oclIsUndefined()
+
+inv PieceInactiveMeansNotCompleted:
+    self.isInactive()
+    implies
+    not self.completed
+
+context Piece::resetToStart() : OclVoid
+
+post ResetMakesPieceInactive:
+    self.position.oclIsUndefined()
+    and
+    not self.completed
+
+post ResetClearsMovementHistory:
+    self.previousStation.oclIsUndefined()

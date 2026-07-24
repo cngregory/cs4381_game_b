@@ -57,11 +57,11 @@ Teams alternate turns throughout the game. During a turn, a player throws four s
 
 ### Capturing and Combining Pieces
 
-These rules are part of the full game but are deferred for HW2:
+These rules are part of the full game:
 
-* If a piece lands on a space occupied by an opponent's piece, the opponent's piece is sent back to Start.
-* If a piece lands on a space occupied by a teammate's piece, those pieces combine and move together as a single piece.
-* If a combined piece is captured by an opponent, all pieces in the combined stack are sent back to Start.
+* If a piece lands on a space occupied by an opponent’s piece, the opponent’s piece is sent back to Start, and the current player receives an extra throw.
+* If a piece lands on a space occupied by a teammate’s piece, those pieces combine and move together as a single stack.
+* If a combined stack is captured by an opponent, every piece in the captured stack is sent back to Start, and the capturing player receives an extra throw.
 
 ### Winning the Game
 
